@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fa">
+  <title>fieldstudy | 桌球發球研究工作台</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="fieldstudy 首頁"><span class="brand-mark">f.</span><span>fieldstudy<small>桌球發球研究工作台</small></span></a>
+    <p class="nav-caption">研究工作流程</p>
+    <nav aria-label="主要功能">
+      <button type="button" class="nav-item active" data-view="train" aria-current="page"><span class="nav-number">01</span><span>上傳與訓練<small>建立你的落點模型</small></span></button>
+      <button type="button" class="nav-item" data-view="predict"><span class="nav-number">02</span><span>四參數預測落點<small>檢視設定的落點分布</small></span></button>
+      <button type="button" class="nav-item" data-view="reverse"><span class="nav-number">03</span><span>目標落點反推<small>搜尋四參數組合</small></span></button>
+      <button type="button" class="nav-item" data-view="multi"><span class="nav-number">04</span><span>多球路推薦<small>同一落點，不同設定</small></span></button>
+      <button type="button" class="nav-item" data-view="sampling"><span class="nav-number">05</span><span>推薦補測資料<small>產生 300 組未測參數</small></span></button>
+    </nav>
+    <div class="sidebar-footer"><span class="local-dot"></span>本機研究環境<span>四參數 · 25 個目標格</span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><span>專題工作空間 <span class="slash">/</span> 智慧控制</span><span id="model-status" class="status-pill">讀取模型狀態</span></header>
+    <main>
+      <div class="page-heading"><div><p class="eyebrow" id="page-kicker">MODEL WORKSPACE / 01</p><h1 id="page-title">從實測資料開始。</h1><p id="page-description">匯入發球紀錄，建立四參數與落點之間的關係。</p></div><span class="version-label">FIELDSTUDY<br><strong>研究工作台</strong></span></div>
+      <div id="connection-error" class="notice error" role="alert" hidden></div>
+
+      <section id="view-train" class="view" aria-label="上傳與訓練">
+        <div class="two-column training-layout">
+          <div class="card">
+            <div class="card-heading"><div><p class="eyebrow">DATA IMPORT</p><h2>上傳實測資料</h2></div><span class="tag">Excel</span></div>
+            <form id="train-form">
+              <label class="dropzone" id="train-drop" for="train-files" tabindex="0">
+                <svg viewBox="0 0 48 48" width="48" height="48" fill="none" aria-hidden="true"><path d="M24 31V9m-8 8 8-8 8 8M10 30v8h28v-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <strong>將檔案拖放到這裡</strong><span>或點擊選擇檔案</span><small>支援 .xlsx、.xls，可一次選擇多個檔案</small>
+                <input id="train-files" type="file" accept=".xlsx,.xls" multiple class="visually-hidden">
+              </label>
+              <ul class="file-list" id="train-file-list" aria-live="polite"></ul>
+              <label class="check-line"><input id="replace-old" type="checkbox"><span>只使用這次上傳的資料<small>勾選後，以新資料取代 data 資料夾中的舊 Excel。</small></span></label>
+              <div class="form-actions"><span class="muted">5 折分組驗證，再以全部資料訓練。</span><button class="primary" type="submit">上傳並開始訓練</button></div>
+            </form>
+          </div>
+          <div class="side-stack">
+            <div class="card compact"><p class="eyebrow">CURRENT MODEL</p><h2>目前模型</h2><div id="model-detail" class="muted">正在讀取狀態。</div></div>
+            <div class="card compact"><p class="eyebrow">BEFORE YOU START</p><h2>資料格式</h2><p class="muted">每列一組設定，記錄五次發球結果。所有參數均為機器可輸入的整數。</p><dl class="limits"><div><dt>仰角角度</dt><dd>1–28</dd></div><div><dt>左右位置</dt><dd>1–9</dd></div><div><dt>旋球設定值</dt><dd>1–59</dd></div><div><dt>出球強度</dt><dd>1–99</dd></div></dl><p class="footnote">Excel 欄名沿用「旋球角度」；數值不是角度或旋轉強度。</p></div>
+          </div>
+        </div>
+        <div id="train-job" class="job-area" aria-live="polite"></div><div id="train-result" class="results"></div>
+      </section>
+
+      <section id="view-predict" class="view" aria-label="四參數預測落點" hidden>
+        <div class="card"><div class="card-heading"><div><p class="eyebrow">FORWARD PREDICTION</p><h2>輸入發球機設定</h2></div><span class="tag">四參數一起預測</span></div>
+          <form id="predict-form"><div class="parameter-grid">
+            <label>仰角角度<input name="elevation" type="number" min="1" max="28" step="1" value="14" required><small>機器設定 1–28</small></label>
+            <label>左右位置<input name="horizontal" type="number" min="1" max="9" step="1" value="5" required><small>機器設定 1–9</small></label>
+            <label>旋球設定值<input name="spin" type="number" min="1" max="59" step="1" value="30" required><small>機器設定 1–59</small></label>
+            <label>出球強度<input name="power" type="number" min="1" max="99" step="1" value="50" required><small>機器設定 1–99</small></label>
+          </div><div class="form-actions"><span class="muted">根據目前模型，檢視各落點的預測機率。</span><button class="primary" type="submit" data-model-required>預測落點</button></div></form>
+        </div><div id="predict-job" class="job-area" aria-live="polite"></div><div id="predict-result" class="results"></div>
+      </section>
+
+      <section id="view-reverse" class="view" aria-label="目標落點反推四參數" hidden>
+        <div class="two-column target-layout"><div class="card"><div class="card-heading"><div><p class="eyebrow">TARGET SELECTION</p><h2>你想讓球落在哪一格？</h2></div><span class="target-label" id="reverse-target">(4,3)</span></div><div class="target-grid" id="reverse-grid" role="group" aria-label="選擇目標落點"></div><p class="footnote">每排由左至右依序為 (X,1)～(X,5)；X 由上至下遞增。</p></div>
+          <div class="card"><p class="eyebrow">REVERSE SEARCH</p><h2>搜尋精準落點方案</h2><p class="muted">一起搜尋仰角、左右位置、旋球與強度的全部 1,471,932 種組合。</p><div class="fixed-rules"><div><span>模型預測目標格機率</span><strong>100<span>%</span></strong></div><div><span>模型預測無效球機率</span><strong>0<span>%</span></strong></div></div><p class="footnote">固定篩選條件。模型機率不代表實機保證，每個方案仍需實測驗證。找不到符合方案時會顯示空結果。</p><form id="reverse-form"><label class="number-label">顯示組數<input id="reverse-count" type="number" min="1" max="100" step="1" value="20" required></label><button class="primary full-width" type="submit" data-model-required>開始反推四參數</button></form></div>
+        </div><div id="reverse-job" class="job-area" aria-live="polite"></div><div id="reverse-result" class="results"></div>
+      </section>
+
+      <section id="view-multi" class="view" aria-label="多球路推薦" hidden>
+        <form id="multi-form"><div class="two-column target-layout"><div class="card"><div class="card-heading"><div><p class="eyebrow">ONE TARGET, MORE ROUTES</p><h2>選擇共同目標落點</h2></div><span class="target-label" id="multi-target">(4,3)</span></div><div class="target-grid" id="multi-grid" role="group" aria-label="選擇多球路目標落點"></div><p class="footnote">每排由左至右依序為 (X,1)～(X,5)；(4,3) 位於第 4 排、第 3 欄。</p></div>
+          <div class="card"><p class="eyebrow">FIXED CRITERIA</p><h2>先符合落點，再挑球路</h2><div class="fixed-rules"><div><span>模型預測目標格機率</span><strong>100<span>%</span></strong></div><div><span>模型預測無效球機率</span><strong>0<span>%</span></strong></div></div><p class="footnote">100% 是模型預測值，實機仍需驗證。球路名稱代表機器設定偏好，未經實測校正的旋球值不命名為上旋、下旋或側旋。</p><label class="number-label">每種球路方案數<input id="multi-count" type="number" min="1" max="20" step="1" value="5" required></label><p class="footnote">每次優先提供尚未顯示的合格組合；候選用完時可能重複，重新啟動服務後紀錄會重置。</p></div>
+        </div><div class="card route-card"><div class="card-heading"><div><p class="eyebrow">ROUTE PREFERENCES</p><h2>選擇想比較的球路</h2></div><div class="text-actions"><button type="button" id="routes-all">全選</button><button type="button" id="routes-clear">清除</button></div></div><div id="route-options" class="route-options"></div><div class="form-actions"><span class="muted">在合格候選內排序，四個參數仍會一起搜尋。</span><button class="primary" type="submit" data-model-required>產生多球路方案</button></div></div></form>
+        <div id="multi-job" class="job-area" aria-live="polite"></div><div id="multi-result" class="results"></div>
+      </section>
+
+      <section id="view-sampling" class="view" aria-label="推薦補測資料" hidden>
+        <div class="card"><div class="card-heading"><div><p class="eyebrow">NEXT EXPERIMENT</p><h2>要產生 300 組補測參數嗎？</h2></div><span class="tag">使用目前模型訓練資料</span></div><p class="muted">直接沿用目前模型訓練時的實測資料，推薦下一輪 300 組補測參數。四參數均為合法整數，排除已有及本次重複組合。</p>
+          <form id="sampling-form"><div class="choice-row"><label class="choice"><input type="radio" name="generate" value="yes" checked><span><strong>產生 300 組補測資料</strong><small>沿用模型訓練資料，直接預覽並下載</small></span></label><label class="choice"><input type="radio" name="generate" value="no"><span><strong>這次先不產生</strong><small>可以稍後回來執行</small></span></label></div>
+            <div id="sampling-fields"><div class="allocation"><div><strong>150</strong><span>空間探索</span><small>補足低密度區域</small></div><div><strong>120</strong><span>分類邊界補強</span><small>鄰近但落點分布不同</small></div><div><strong>30</strong><span>隨機驗證</span><small>保留全域探索機會</small></div></div><p class="footnote">四參數依設備範圍縮放至 0–1；以歐氏距離 ≤ 0.15 的異分布點對找補強區。邊界候選不足的名額轉給空間探索。</p>
+              <div class="source-summary" aria-live="polite"><p class="eyebrow">TRAINING DATA SOURCE</p><h3>目前模型的訓練資料</h3><div id="sampling-source">正在讀取訓練資料來源。</div></div>
+            </div><div class="form-actions"><span class="muted">輸出保留原始欄位，五球落點留白供紀錄。</span><button class="primary" id="sampling-submit" type="submit">產生 300 組補測資料</button></div>
+          </form>
+        </div><div id="sampling-job" class="job-area" aria-live="polite"></div><div id="sampling-result" class="results"></div>
+      </section>
+      <footer class="page-footer"><span>fieldstudy / 桌球自動發球機專題</span><span>實測資料 → 落點模型 → 參數搜尋 → 補測驗證</span></footer>
+    </main>
+  </div>
+</body>
+</html>
