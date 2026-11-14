@@ -99,7 +99,7 @@ function renderReport(report) {
   if (!displayedRun) showStatus("prediction-status", "");
   displayedRun = report.run_id;
   updateButtons();
-  byId("report-status").textContent = "成果批次 " + report.run_id;
+  byId("report-status").hidden = true;
   byId("report-note").textContent = report.note;
   byId("selected-models").textContent = "勝出模型　X 軸 " + report.winners.x + "　Y 軸 " + report.winners.y;
   const scores = byId("scores");

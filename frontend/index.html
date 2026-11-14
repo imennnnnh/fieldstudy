@@ -6,6 +6,9 @@
   <title>桌球發球機落點預測</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
+  <style>
+    #report:not([hidden]) + #report-status { display: none; }
+  </style>
 </head>
 <body>
   <main>
@@ -54,7 +57,6 @@
 
     <section class="panel" aria-labelledby="report-heading">
       <h2 id="report-heading">整批評估報表</h2>
-      <p id="report-status">請先完成訓練</p>
       <div id="report" hidden>
         <p id="report-note" class="note"></p>
         <p id="selected-models"></p>
@@ -69,6 +71,7 @@
         <dl id="metrics" class="metrics"></dl>
         <div id="matrices" class="matrices"></div>
       </div>
+      <p id="report-status">請先完成訓練</p>
     </section>
   </main>
 </body>
