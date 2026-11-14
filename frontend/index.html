@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>桌球發球機落點預測</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>桌球發球機落點預測</h1>
+    <div class="workspace">
+      <section class="panel" aria-labelledby="training-heading">
+        <h2 id="training-heading">模型訓練</h2>
+        <form id="training-form">
+          <label for="files">選擇三份實測 Excel（.xlsx）</label>
+          <input id="files" name="files" type="file" accept=".xlsx" multiple required>
+          <ul id="selected-files" hidden></ul>
+          <button id="train-button" type="submit" disabled>啟動訓練</button>
+        </form>
+        <p id="train-status" role="status"></p>
+        <progress id="train-progress" aria-label="目前階段已完成的模型數" hidden></progress>
+        <p id="data-counts"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="prediction-heading">
+        <h2 id="prediction-heading">單球預測</h2>
+        <form id="prediction-form">
+          <div class="parameters">
+            <label>仰角角度 <small>1～28</small><input name="angle" type="number" min="1" max="28" step="1" required></label>
+            <label>左右位置 <small>1～9</small><input name="position" type="number" min="1" max="9" step="1" required></label>
+            <label>旋球角度 <small>1～59</small><input name="spin" type="number" min="1" max="59" step="1" required></label>
+            <label>出球強度 <small>1～99</small><input name="strength" type="number" min="1" max="99" step="1" required></label>
+          </div>
+          <label for="measured-status">實測落點</label>
+          <select id="measured-status">
+            <option value="unfilled">未填</option>
+            <option value="valid">有效球</option>
+            <option value="invalid">無效球</option>
+          </select>
+          <div id="measured-coordinates" class="parameters" hidden>
+            <label>實測 X <small>1～5</small><input name="x" type="number" min="1" max="5" step="1" disabled></label>
+            <label>實測 Y <small>1～5</small><input name="y" type="number" min="1" max="5" step="1" disabled></label>
+          </div>
+          <button id="predict-button" type="submit" disabled>預測落點</button>
+        </form>
+        <div id="prediction-result" aria-live="polite">
+          <p id="prediction-status">請先完成訓練</p>
+          <p id="comparison"></p>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="report-heading">
+      <h2 id="report-heading">整批評估報表</h2>
+      <p id="report-status">請先完成訓練</p>
+      <div id="report" hidden>
+        <p id="report-note" class="note"></p>
+        <p id="selected-models"></p>
+        <div class="table-wrap">
+          <table>
+            <caption>五折 Macro F1</caption>
+            <thead><tr><th scope="col">模型</th><th scope="col">A</th><th scope="col">B</th><th scope="col">C</th><th scope="col">D</th><th scope="col">E</th><th scope="col">平均</th></tr></thead>
+            <tbody id="scores"></tbody>
+          </table>
+        </div>
+        <p id="validation-count"></p>
+        <dl id="metrics" class="metrics"></dl>
+        <div id="matrices" class="matrices"></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
