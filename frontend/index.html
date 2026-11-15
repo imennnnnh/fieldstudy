@@ -6,93 +6,157 @@
   <title>桌球發球機落點預測</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
-  <style>
-    #report:not([hidden]) + #report-status { display: none; }
-  </style>
 </head>
 <body>
-  <main>
-    <h1>桌球發球機落點預測</h1>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>桌球自動發球機精準落點與四參數智慧控制模型</span>
+      </a>
+      <div class="model-state" id="model-state" data-state="checking">
+        <span>正式模型</span>
+        <strong id="model-state-text" role="status">確認中…</strong>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell" id="top" aria-label="桌球發球機落點預測">
+
     <div class="workspace">
-      <section class="panel" aria-labelledby="training-heading">
+      <section class="panel" id="training" aria-labelledby="training-heading">
         <h2 id="training-heading">模型訓練</h2>
+        <div class="file-group uploaded-training" id="uploaded-training" hidden>
+          <h3 id="uploaded-files-heading">最近上傳的訓練檔案</h3>
+          <ul class="file-list" id="uploaded-files" aria-labelledby="uploaded-files-heading" tabindex="0"></ul>
+        </div>
         <form id="training-form">
-          <label for="files">選擇訓練用實測 Excel（.xlsx，可複選）</label>
-          <input id="files" name="files" type="file" accept=".xlsx" multiple required aria-describedby="training-file-help train-file-error">
-          <small id="training-file-help">每次使用當次選取的全部檔案。要合併舊資料和新資料，請一次選取所有檔案。</small>
-          <ul id="selected-files" hidden></ul>
-          <p id="train-file-error" class="error" role="status"></p>
+          <label class="file-picker" for="files">
+            <span class="file-icon" aria-hidden="true"></span>
+            <span class="file-copy">
+              <span class="file-title" id="training-file-label">選擇訓練檔案</span>
+              <span class="file-meta" id="training-file-format">Excel (.xlsx) · 可選多份</span>
+            </span>
+            <input id="files" name="files" type="file" accept=".xlsx" multiple required aria-labelledby="training-file-label" aria-describedby="training-file-format training-file-help train-file-error">
+          </label>
+          <div class="file-group" id="selected-training" hidden>
+            <h3 id="selected-files-heading">本次選取的檔案</h3>
+            <ul class="file-list" id="selected-files" aria-labelledby="selected-files-heading" tabindex="0"></ul>
+          </div>
+          <p class="field-help" id="training-file-help">每次訓練只使用當次選取的檔案。合併新舊資料時，請一次選取所有檔案。</p>
+          <p id="train-file-error" class="feedback error" role="status"></p>
           <button id="train-button" type="submit" disabled>啟動訓練</button>
         </form>
-        <p id="train-status" role="status"></p>
+        <p id="train-status" class="feedback" role="status"></p>
         <progress id="train-progress" aria-label="目前階段已完成的模型數" hidden></progress>
-        <p id="data-counts"></p>
+        <p id="data-counts" class="field-help"></p>
       </section>
 
-      <section class="panel" aria-labelledby="prediction-heading">
+      <section class="panel" id="prediction" aria-labelledby="prediction-heading">
         <h2 id="prediction-heading">單球預測</h2>
         <form id="prediction-form">
           <div class="parameters">
-            <label>仰角角度 <small>1～28</small><input name="angle" type="number" min="1" max="28" step="1" required></label>
-            <label>左右位置 <small>1～9</small><input name="position" type="number" min="1" max="9" step="1" required></label>
-            <label>旋球角度 <small>1～59</small><input name="spin" type="number" min="1" max="59" step="1" required></label>
-            <label>出球強度 <small>1～99</small><input name="strength" type="number" min="1" max="99" step="1" required></label>
-          </div>
-          <label for="measured-status">實測落點</label>
-          <select id="measured-status">
-            <option value="unfilled">未填</option>
-            <option value="valid">有效球</option>
-            <option value="invalid">無效球</option>
-          </select>
-          <div id="measured-coordinates" class="parameters" hidden>
-            <label>實測 X <small>1～5</small><input name="x" type="number" min="1" max="5" step="1" disabled></label>
-            <label>實測 Y <small>1～5</small><input name="y" type="number" min="1" max="5" step="1" disabled></label>
+            <label class="field">
+              <span class="field-label">仰角角度 <small>1–28</small></span>
+              <input name="angle" type="number" min="1" max="28" step="1" inputmode="numeric" required>
+            </label>
+            <label class="field">
+              <span class="field-label">左右位置 <small>1–9</small></span>
+              <input name="position" type="number" min="1" max="9" step="1" inputmode="numeric" required>
+            </label>
+            <label class="field">
+              <span class="field-label">旋球角度 <small>1–59</small></span>
+              <input name="spin" type="number" min="1" max="59" step="1" inputmode="numeric" required>
+            </label>
+            <label class="field">
+              <span class="field-label">出球強度 <small>1–99</small></span>
+              <input name="strength" type="number" min="1" max="99" step="1" inputmode="numeric" required>
+            </label>
           </div>
           <button id="predict-button" type="submit" disabled>預測落點</button>
         </form>
-        <div id="prediction-result" aria-live="polite">
+        <div id="prediction-result" class="result-box" aria-live="polite" aria-atomic="true">
+          <p class="result-label">預測結果</p>
           <p id="prediction-status">請先完成訓練</p>
-          <p id="comparison"></p>
         </div>
+      </section>
+
+      <section class="panel" id="measurement" aria-labelledby="measurement-heading">
+        <h2 id="measurement-heading">實測落點</h2>
+        <div class="measurement-fields">
+          <label class="field" for="measured-status">
+            <span class="field-label">實測結果 <small>選填</small></span>
+            <span class="select-wrap">
+              <select id="measured-status">
+                <option value="unfilled">未填</option>
+                <option value="valid">有效球</option>
+                <option value="invalid">無效球</option>
+              </select>
+            </span>
+          </label>
+          <fieldset id="measured-coordinates" class="parameters" aria-label="實測座標" hidden disabled>
+            <label class="field">
+              <span class="field-label">實測 X <small>1–5</small></span>
+              <input name="x" type="number" min="1" max="5" step="1" inputmode="numeric" required>
+            </label>
+            <label class="field">
+              <span class="field-label">實測 Y <small>1–5</small></span>
+              <input name="y" type="number" min="1" max="5" step="1" inputmode="numeric" required>
+            </label>
+          </fieldset>
+        </div>
+        <div class="result-box" aria-live="polite" aria-atomic="true">
+          <p class="result-label">比對結果</p>
+          <p id="comparison">完成單球預測後即可比對。</p>
+        </div>
+      </section>
+
+      <section class="panel" id="independent-test" aria-labelledby="test-heading">
+        <h2 id="test-heading">正式模型獨立測試</h2>
+        <form id="test-form">
+          <label class="file-picker" for="test-file">
+            <span class="file-icon" aria-hidden="true"></span>
+            <span class="file-copy">
+              <span class="file-title" id="test-file-label">選擇測試檔案</span>
+              <span class="file-meta" id="test-file-format">Excel (.xlsx) · 每次一份</span>
+            </span>
+            <input id="test-file" name="files" type="file" accept=".xlsx" required aria-labelledby="test-file-label" aria-describedby="test-file-format test-model-hint test-filename">
+          </label>
+          <p class="selected-file" id="test-filename"></p>
+          <p id="test-model-hint" class="field-help">請先完成訓練</p>
+          <button id="evaluate-button" type="submit" disabled>開始評估</button>
+        </form>
+        <p id="test-status" class="feedback" role="status"></p>
       </section>
     </div>
 
-    <section class="panel" aria-labelledby="test-heading">
-      <h2 id="test-heading">正式模型獨立測試</h2>
-      <form id="test-form">
-        <label for="test-file">上傳測試 Excel（.xlsx，每次一份）</label>
-        <input id="test-file" name="files" type="file" accept=".xlsx" required>
-        <button id="evaluate-button" type="submit" disabled>開始評估</button>
-      </form>
-      <p id="test-model-hint">請先完成訓練</p>
-      <p id="test-status" role="status"></p>
-    </section>
-
-    <section class="panel" aria-labelledby="report-heading">
+    <section class="panel report-panel" id="report-section" aria-labelledby="report-heading">
       <h2 id="report-heading">五折整批評估報表</h2>
-      <div id="report" hidden>
+      <div id="report" class="report-content" hidden>
         <p id="report-note" class="note"></p>
-        <p id="selected-models"></p>
-        <div class="table-wrap">
+        <p id="selected-models" class="report-meta"></p>
+        <div class="table-wrap" tabindex="0" role="region" aria-labelledby="scores-caption">
           <table>
-            <caption>五折 Macro F1</caption>
+            <caption id="scores-caption">五折 Macro F1</caption>
             <thead><tr><th scope="col">模型</th><th scope="col">A</th><th scope="col">B</th><th scope="col">C</th><th scope="col">D</th><th scope="col">E</th><th scope="col">平均</th></tr></thead>
             <tbody id="scores"></tbody>
           </table>
         </div>
-        <p id="validation-count"></p>
+        <p id="validation-count" class="report-meta"></p>
         <dl id="metrics" class="metrics"></dl>
         <div id="matrices" class="matrices"></div>
       </div>
-      <p id="report-status">請先完成訓練</p>
+      <p class="report-empty" id="report-status">請先完成訓練</p>
     </section>
 
-    <section id="test-result" class="panel" aria-labelledby="test-result-heading" hidden>
+    <section id="test-result" class="panel report-panel" aria-labelledby="test-result-heading" hidden>
       <h2 id="test-result-heading">正式模型獨立測試結果</h2>
-      <p id="test-source"></p>
-      <p id="test-count"></p>
-      <dl id="test-metrics" class="metrics"></dl>
-      <div id="test-matrices" class="matrices"></div>
+      <div class="report-content">
+        <p id="test-source" class="report-meta"></p>
+        <p id="test-count" class="report-meta"></p>
+        <dl id="test-metrics" class="metrics"></dl>
+        <div id="test-matrices" class="matrices"></div>
+      </div>
     </section>
   </main>
 </body>

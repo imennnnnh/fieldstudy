@@ -54,6 +54,21 @@ def save_uploads(data_dir, run_id, files):
     return sources
 
 
+def load_uploaded_filenames(data_dir, run_id):
+    """讀取既有訓練批次的上傳原檔名。"""
+    try:
+        directory = data_dir / "uploads" / str(UUID(str(run_id)))
+        manifest = read_json(directory / "sources.json")
+    except (OSError, ValueError):
+        return []
+    if not isinstance(manifest, list):
+        return []
+    return [
+        source["filename"] for source in manifest
+        if isinstance(source, dict) and isinstance(source.get("filename"), str)
+    ]
+
+
 def load_bundle(directory, run_id):
     report = read_json(directory / "report.json")
     if report["run_id"] != run_id or report["scikit_learn_version"] != sklearn.__version__:

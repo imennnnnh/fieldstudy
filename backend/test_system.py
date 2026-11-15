@@ -7,13 +7,14 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from uuid import uuid4
 
 import numpy as np
 from openpyxl import Workbook
 
 from .app import compare_landing, create_app, predict
 from .excel_loader import EXCEL_HEADERS, DataError, ExcelSource, parse_integer, read_excel
-from .storage import PublishedRun, read_json, write_json
+from .storage import PublishedRun, read_json, save_uploads, write_json
 from .training import evaluate, make_folds, make_model, score_axis
 
 
@@ -288,6 +289,40 @@ class APITests(unittest.IsolatedAsyncioTestCase):
                 await request(app, "POST", endpoint, **multipart(files)),
                 (409, {"error": "正式模型已更新，請重新執行獨立測試。"}),
             )
+
+    async def test_uploaded_filenames_survive_restart(self):
+        """既有批次、新上傳和重啟後都能回傳已保存的原檔名。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_id = str(uuid4())
+            status_file = root / "artifacts" / "training_status.json"
+            status_file.parent.mkdir()
+            save_uploads(root, run_id, [("舊資料.xlsx", io.BytesIO(b"old data"))])
+            write_json(status_file, {
+                "run_id": run_id, "status": "completed", "phase": "completed", "message": "訓練完成",
+            })
+
+            endpoint = "/api/training/status"
+            app = create_app(root)
+            async with app.router.lifespan_context(app):
+                status, job = await request(app, "GET", endpoint)
+                self.assertEqual((status, job["uploaded_files"]), (200, ["舊資料.xlsx"]))
+
+                new_files = [("新資料.xlsx", b"invalid Excel"), ("新資料.xlsx", b"another file")]
+                status, job = await request(app, "POST", "/api/training", **multipart(new_files))
+                expected = [filename for filename, _ in new_files]
+                self.assertEqual((status, job["uploaded_files"]), (202, expected))
+                await app.state.task
+                _, job = await request(app, "GET", endpoint)
+                self.assertEqual((job["status"], job["uploaded_files"]), ("failed", expected))
+
+                status, _ = await request(app, "POST", "/api/training", **multipart([]))
+                self.assertEqual(status, 400)
+
+            restarted = create_app(root)
+            async with restarted.router.lifespan_context(restarted):
+                _, job = await request(restarted, "GET", endpoint)
+                self.assertEqual(job["uploaded_files"], expected)
 
     async def test_upload_train_restart_and_preserve_previous_success(self):
         """驗證多檔訓練、重啟載入與失敗時保留正式成果。"""

@@ -19,7 +19,7 @@ from starlette.staticfiles import StaticFiles
 
 from .evaluation import evaluate_test_workbook
 from .excel_loader import PARAMETERS, DataError, ExcelSource, parse_integer, read_excel
-from .storage import load_latest, publish, read_json, save_uploads, write_json
+from .storage import load_latest, load_uploaded_filenames, publish, read_json, save_uploads, write_json
 from .training import TrainingError, is_valid, train
 
 
@@ -31,9 +31,9 @@ ACTIVE_STATUSES = {"uploading", "running"}
 
 def update_job(state, status, phase, message, **details):
     """更新目前訓練任務，並嘗試保存狀態。"""
-    counts = state.job.get("counts")
-    if counts is not None:
-        details.setdefault("counts", counts)
+    for field in ("counts", "uploaded_files"):
+        if field in state.job:
+            details.setdefault(field, state.job[field])
     state.job = {
         "run_id": state.job["run_id"],
         "status": status, "phase": phase, "message": message,
@@ -74,6 +74,13 @@ def create_app(data_dir=ROOT / "data"):
                 state.job = saved
             except (OSError, ValueError):
                 LOGGER.exception("Could not load training status")
+        uploaded_files = await run_in_threadpool(
+            load_uploaded_filenames, state.data_dir, state.job["run_id"],
+        ) or state.job.get("uploaded_files")
+        if not uploaded_files and state.published:
+            sources = state.published.report.get("data", {}).get("sources", [])
+            uploaded_files = [source["filename"] for source in sources]
+        state.job["uploaded_files"] = uploaded_files or []
         if state.job["status"] in ACTIVE_STATUSES:
             if state.published and state.published.run_id == state.job["run_id"]:
                 update_job(state, "completed", "completed", "訓練完成")
@@ -127,7 +134,7 @@ async def start_training(request):
         raise HTTPException(409, "已有訓練進行中")
 
     run_id = str(uuid4())
-    state.job = {"run_id": run_id}
+    state.job = {"run_id": run_id, "uploaded_files": state.job["uploaded_files"]}
     update_job(state, "uploading", "uploading", "接收訓練用 Excel")
     try:
         async with request.form(max_files=float("inf"), max_fields=0) as form:
@@ -153,7 +160,10 @@ async def start_training(request):
         update_job(state, "failed", "uploading", message)
         raise HTTPException(500, message) from error
 
-    update_job(state, "running", "reading", "準備讀取 Excel")
+    update_job(
+        state, "running", "reading", "準備讀取 Excel",
+        uploaded_files=[source.filename for source in sources],
+    )
     state.task = asyncio.create_task(train_in_background(state, run_id, sources))
     return JSONResponse(job_payload(state), status_code=202)
 

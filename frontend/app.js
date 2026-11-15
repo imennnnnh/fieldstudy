@@ -4,7 +4,11 @@ const byId = (id) => document.getElementById(id);
 const files = byId("files");
 const testFile = byId("test-file");
 const measuredStatus = byId("measured-status");
+const measuredCoordinates = byId("measured-coordinates");
+const measuredX = measuredCoordinates.querySelector('[name="x"]');
+const measuredY = measuredCoordinates.querySelector('[name="y"]');
 const predictionForm = byId("prediction-form");
+const predictionResult = byId("prediction-result");
 const number = new Intl.NumberFormat("zh-TW");
 const percent = new Intl.NumberFormat("zh-TW", { style: "percent", maximumFractionDigits: 2 });
 const phases = {
@@ -20,6 +24,7 @@ let trainingActive = false;
 let lastJobStatus = null;
 let submitting = false;
 let predicting = false;
+let lastPrediction = null;
 let testing = false;
 let displayedRun = null;
 let latestRun = null;
@@ -51,6 +56,13 @@ function excelSelectionError(input, single = false) {
   return invalidFile ? "「" + invalidFile.name + "」須為 .xlsx 檔案。" : "";
 }
 
+function showModelState(state, message) {
+  const indicator = byId("model-state");
+  indicator.dataset.state = state;
+  const text = byId("model-state-text");
+  if (text.textContent !== message) text.textContent = message;
+}
+
 function updateButtons() {
   files.disabled = trainingActive || submitting;
   byId("train-button").disabled = files.disabled || Boolean(excelSelectionError(files));
@@ -59,12 +71,18 @@ function updateButtons() {
   const modelReady = Boolean(latestRun) && latestRun === displayedRun;
   const testHint = byId("test-model-hint");
   if (modelReady) {
-    testHint.textContent = testFile.files.length ? "" : "請上傳一份測試 Excel（.xlsx）。";
+    showModelState("ready", "已就緒");
+    testHint.textContent = "";
   } else if (latestRun) {
+    showModelState("checking", "載入中…");
     testHint.textContent = "正在載入正式模型報表…";
   } else if (lastJobStatus === "completed") {
+    showModelState("unavailable", "尚未就緒");
     testHint.textContent = "訓練已完成，但目前無法載入正式模型。請查看後端終端機訊息。";
   } else {
+    if (trainingActive || submitting) showModelState("training", "訓練中");
+    else if (lastJobStatus === null) showModelState("checking", "確認中…");
+    else showModelState("unavailable", lastJobStatus === "idle" ? "尚未訓練" : "尚未就緒");
     testHint.textContent = lastJobStatus === null ? "正在確認正式模型…" : "請先完成訓練";
   }
 
@@ -78,10 +96,25 @@ function showStatus(id, message, error = false) {
   element.classList.toggle("error", error);
 }
 
+function renderFileList(list, filenames) {
+  if (list.children.length === filenames.length &&
+      filenames.every((name, index) => list.children[index].textContent === name)) return;
+  const items = document.createDocumentFragment();
+  for (const name of filenames) {
+    const item = document.createElement("li");
+    item.textContent = name;
+    items.append(item);
+  }
+  list.replaceChildren(items);
+}
+
 function renderJob(job) {
   lastJobStatus = job.status;
   trainingActive = activeJob(job);
   updateButtons();
+  const uploadedFiles = job.uploaded_files ?? [];
+  renderFileList(byId("uploaded-files"), uploadedFiles);
+  byId("uploaded-training").hidden = !uploadedFiles.length;
   const progress = byId("train-progress");
   progress.hidden = !trainingActive || !job.total;
   if (!progress.hidden) {
@@ -158,7 +191,7 @@ function renderEvaluation(evaluation, metricsId, matricesId, modelMetrics = []) 
 }
 
 function renderReport(report) {
-  if (!displayedRun) showStatus("prediction-status", "");
+  if (!displayedRun) showStatus("prediction-status", "等待輸入參數");
   displayedRun = report.run_id;
   updateButtons();
   byId("report-status").hidden = true;
@@ -223,6 +256,7 @@ async function refreshJob() {
         renderReport(report);
       }
     } catch (error) {
+      if (!displayedRun || latestRun !== displayedRun) showModelState("unavailable", "暫時無法確認");
       showStatus("train-status", "無法更新訓練狀態，將重新連線。 " + error.message, true);
     } finally {
       polling = null;
@@ -232,14 +266,8 @@ async function refreshJob() {
 }
 
 files.addEventListener("change", () => {
-  const list = byId("selected-files");
-  list.replaceChildren();
-  for (const file of files.files) {
-    const item = document.createElement("li");
-    item.textContent = file.name;
-    list.append(item);
-  }
-  list.hidden = !files.files.length;
+  renderFileList(byId("selected-files"), Array.from(files.files, (file) => file.name));
+  byId("selected-training").hidden = !files.files.length;
   const error = excelSelectionError(files);
   files.setCustomValidity(error);
   byId("train-file-error").textContent = files.files.length ? error : "";
@@ -266,6 +294,7 @@ byId("training-form").addEventListener("submit", async (event) => {
 
 testFile.addEventListener("change", () => {
   clearTestResult();
+  byId("test-filename").textContent = testFile.files[0]?.name ?? "";
   const error = testFile.files.length ? excelSelectionError(testFile, true) : "";
   showStatus("test-status", error, Boolean(error));
   updateButtons();
@@ -306,47 +335,64 @@ byId("test-form").addEventListener("submit", async (event) => {
   }
 });
 
-measuredStatus.addEventListener("change", () => {
-  const enabled = measuredStatus.value === "valid";
-  byId("measured-coordinates").hidden = !enabled;
-  for (const axis of ["x", "y"]) {
-    predictionForm.elements[axis].disabled = !enabled;
-    predictionForm.elements[axis].required = enabled;
+function comparisonMessage() {
+  if (!lastPrediction) return "完成單球預測後即可比對。";
+  if (measuredStatus.value === "unfilled") return "選擇實測結果即可比對。";
+
+  const measuredValid = measuredStatus.value === "valid";
+  if (measuredValid && (!measuredX.validity.valid || !measuredY.validity.valid)) {
+    return "請輸入 1–5 的整數座標。";
   }
-});
+  const x = measuredValid ? measuredX.valueAsNumber : 0;
+  const y = measuredValid ? measuredY.valueAsNumber : 0;
+  const measured = "實測 " + formatLanding(x, y) + " · ";
+  if (lastPrediction.valid !== measuredValid) return measured + "有效性不一致";
+  if (!measuredValid) return measured + "同為無效";
+
+  const distance = Math.hypot(lastPrediction.x - x, lastPrediction.y - y);
+  const match = distance === 0 ? "座標相同" : "座標不同";
+  return measured + match + "，距離 " + distance.toFixed(3) + " 格";
+}
+
+function renderComparison() {
+  const comparison = byId("comparison");
+  const message = comparisonMessage();
+  if (comparison.textContent !== message) comparison.textContent = message;
+}
+
+function updateMeasuredFields() {
+  const enabled = measuredStatus.value === "valid";
+  measuredCoordinates.hidden = !enabled;
+  measuredCoordinates.disabled = !enabled;
+  renderComparison();
+}
+
+measuredStatus.addEventListener("change", updateMeasuredFields);
+measuredCoordinates.addEventListener("input", renderComparison);
 
 predictionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!displayedRun || predicting) return;
-  const values = new FormData(predictionForm);
-  const payload = { measured: { status: measuredStatus.value } };
-  for (const key of ["angle", "position", "spin", "strength"]) {
-    payload[key] = values.get(key);
-  }
-  if (measuredStatus.value === "valid") {
-    payload.measured.x = values.get("x");
-    payload.measured.y = values.get("y");
-  }
+  const payload = Object.fromEntries(new FormData(predictionForm));
   predicting = true;
+  lastPrediction = null;
   updateButtons();
+  predictionResult.dataset.state = "pending";
   showStatus("prediction-status", "正在預測…");
-  byId("comparison").textContent = "";
+  renderComparison();
   try {
     const result = await api("/api/predict", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    lastPrediction = result;
     const label = result.valid ? "有效球" : "無效球";
+    predictionResult.dataset.state = result.valid ? "valid" : "invalid";
     showStatus("prediction-status", label + " " + formatLanding(result.x, result.y));
-    const comparison = result.comparison;
-    if (comparison) {
-      const detail = comparison.status === "both_valid"
-        ? (comparison.same_cell ? "座標相同" : "座標不同") + "，距離 " + comparison.distance.toFixed(3) + " 格"
-        : comparison.message;
-      byId("comparison").textContent = "實測 " + formatLanding(...comparison.measured) + " · " + detail;
-    }
+    renderComparison();
   } catch (error) {
+    predictionResult.dataset.state = "error";
     showStatus("prediction-status", error.message, true);
   } finally {
     predicting = false;
@@ -354,6 +400,7 @@ predictionForm.addEventListener("submit", async (event) => {
   }
 });
 
+updateMeasuredFields();
 updateButtons();
 refreshJob();
 setInterval(refreshJob, 1500);
