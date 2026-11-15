@@ -1,6 +1,7 @@
 "use strict";
 
 const byId = (id) => document.getElementById(id);
+const siteHeader = document.querySelector(".site-header");
 const files = byId("files");
 const testFile = byId("test-file");
 const measuredStatus = byId("measured-status");
@@ -400,7 +401,17 @@ predictionForm.addEventListener("submit", async (event) => {
   }
 });
 
+function updateHeaderScroll() {
+  siteHeader.classList.toggle("is-scrolled", window.scrollY > 8);
+}
+
+window.addEventListener("scroll", updateHeaderScroll, { passive: true });
+updateHeaderScroll();
 updateMeasuredFields();
 updateButtons();
 refreshJob();
 setInterval(refreshJob, 1500);
+
+new IntersectionObserver(([entry]) => {
+  document.body.classList.toggle("can-scroll-down", !entry.isIntersecting);
+}).observe(byId("page-end"));
