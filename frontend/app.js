@@ -17,6 +17,7 @@ const phases = {
   publishing: "保存與發布",
 };
 let trainingActive = false;
+let lastJobStatus = null;
 let submitting = false;
 let predicting = false;
 let testing = false;
@@ -55,10 +56,20 @@ function updateButtons() {
   byId("train-button").disabled = files.disabled || Boolean(excelSelectionError(files));
   byId("predict-button").disabled = predicting || !displayedRun;
 
+  const modelReady = Boolean(latestRun) && latestRun === displayedRun;
+  const testHint = byId("test-model-hint");
+  if (modelReady) {
+    testHint.textContent = testFile.files.length ? "" : "請上傳一份測試 Excel（.xlsx）。";
+  } else if (latestRun) {
+    testHint.textContent = "正在載入正式模型報表…";
+  } else if (lastJobStatus === "completed") {
+    testHint.textContent = "訓練已完成，但目前無法載入正式模型。請查看後端終端機訊息。";
+  } else {
+    testHint.textContent = lastJobStatus === null ? "正在確認正式模型…" : "請先完成訓練";
+  }
+
   testFile.disabled = testing;
-  byId("test-model-hint").hidden = Boolean(latestRun);
-  byId("evaluate-button").disabled =
-    testing || !latestRun || latestRun !== displayedRun || Boolean(excelSelectionError(testFile, true));
+  byId("evaluate-button").disabled = testing || !modelReady || Boolean(excelSelectionError(testFile, true));
 }
 
 function showStatus(id, message, error = false) {
@@ -68,6 +79,7 @@ function showStatus(id, message, error = false) {
 }
 
 function renderJob(job) {
+  lastJobStatus = job.status;
   trainingActive = activeJob(job);
   updateButtons();
   const progress = byId("train-progress");
@@ -342,5 +354,6 @@ predictionForm.addEventListener("submit", async (event) => {
   }
 });
 
+updateButtons();
 refreshJob();
 setInterval(refreshJob, 1500);
