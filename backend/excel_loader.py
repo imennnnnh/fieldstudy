@@ -1,7 +1,10 @@
+"""驗證實測 Excel 的欄位並展開逐球落點資料。"""
+
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import BinaryIO
 
 from openpyxl import load_workbook
 
@@ -24,6 +27,8 @@ NUMBER_TEXT = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9
 
 
 class DataError(ValueError):
+    """描述資料錯誤及可供定位的欄位資訊。"""
+
     def __init__(self, message, **details):
         super().__init__(message)
         self.details = details
@@ -31,13 +36,17 @@ class DataError(ValueError):
 
 @dataclass(frozen=True)
 class ExcelSource:
+    """表示一份實測 Excel 的識別碼、原檔名及內容來源。"""
+
     file_id: int
     filename: str
-    path: Path
+    path: Path | BinaryIO
 
 
 @dataclass(frozen=True)
 class Ball:
+    """保存一顆有實測落點的球及其原始位置。"""
+
     ball_id: str
     file_id: int
     filename: str
@@ -51,6 +60,7 @@ class Ball:
 
 
 def parse_integer(value, label, maximum):
+    """將 Excel 或 API 的數值解析為指定範圍內的整數。"""
     try:
         if isinstance(value, str):
             stripped = value.strip()
@@ -72,10 +82,12 @@ def parse_integer(value, label, maximum):
 
 
 def is_blank(value):
+    """判斷 Excel 儲存格是否為空值或純空白字串。"""
     return value is None or isinstance(value, str) and not value.strip()
 
 
 def parse_landing(value):
+    """將落點解析為座標、無效球座標或缺測。"""
     if not isinstance(value, str):
         return None
     label = value.strip()
@@ -86,6 +98,7 @@ def parse_landing(value):
 
 
 def read_sheets(workbook, source, balls, counts):
+    """處理表頭符合規範的工作表，累加逐球資料與計數。"""
     sheets = []
     for sheet in workbook.worksheets:
         if sheet.title in {"說明", "下拉選單"}:
@@ -132,6 +145,7 @@ def read_sheets(workbook, source, balls, counts):
 
 
 def read_excel(sources, progress):
+    """合併來源的逐球紀錄並回傳實測球數統計。"""
     balls = []
     counts = dict(total_balls=0, valid_balls=0, invalid_balls=0, missing_balls=0)
     used_sources = []
